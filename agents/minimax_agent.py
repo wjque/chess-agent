@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from chess.constants import PIECE_VALUES, RED
+from chess.endgame import EndgameBook
 from chess.evaluate import MATE_SCORE, evaluate_state
 from chess.move import Move
 from chess.opening import OpeningBook
@@ -31,17 +32,25 @@ class MinimaxAgent:
     name: str = "minimax"
     max_depth: int = 5
     seed: int = 20260405
+    use_opening_book: bool = True
+    use_endgame_book: bool = True
 
     def __post_init__(self) -> None:
         self._tt: dict[str, TTEntry] = {}
         self._history: dict[str, int] = {}
         self._killer: dict[int, list[str]] = {}
-        self._book = OpeningBook(seed=self.seed + 17)
+        self._opening_book = OpeningBook(seed=self.seed + 17) if self.use_opening_book else None
+        self._endgame_book = EndgameBook(seed=self.seed + 23) if self.use_endgame_book else None
 
     def select_move(self, state: GameState, time_limit_ms: int = 1500) -> Optional[Move]:
-        opening_move = self._book.query_opening(state)
-        if opening_move is not None:
-            return opening_move
+        if self._opening_book is not None:
+            opening_move = self._opening_book.query_opening(state)
+            if opening_move is not None:
+                return opening_move
+        if self._endgame_book is not None:
+            endgame_move = self._endgame_book.query_endgame(state)
+            if endgame_move is not None:
+                return endgame_move
 
         legal_moves = state.generate_legal_moves()
         if not legal_moves:
@@ -195,4 +204,3 @@ class MinimaxAgent:
             return score
 
         return sorted(moves, key=move_score, reverse=True)
-

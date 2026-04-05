@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "max_piece_count": 6,
+  "exact_positions": [
+    {
+      "id": "red_rook_captures_king",
+      "side_to_move": "r",
+      "rows": [
+        "....k....",
+        "....R....",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        "....K...."
+      ],
+      "best_moves": ["1404"],
+      "winner": "r",
+      "dtm": 1,
+      "note": "Rook directly captures the black king."
+    },
+    {
+      "id": "black_rook_captures_king",
+      "side_to_move": "b",
+      "rows": [
+        "....k....",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        "....r....",
+        "....K...."
+      ],
+      "best_moves": ["8494"],
+      "winner": "b",
+      "dtm": 1,
+      "note": "Symmetric immediate king capture for black."
+    },
+    {
+      "id": "red_pawn_captures_king",
+      "side_to_move": "r",
+      "rows": [
+        "....k....",
+        "....P....",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        ".........",
+        "....K...."
+      ],
+      "best_moves": ["1404"],
+      "winner": "r",
+      "dtm": 1,
+      "note": "Advanced pawn finishes the game."
+    }
+  ]
+}

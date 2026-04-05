@@ -13,6 +13,8 @@ def create_agent(
     name: str,
     side: str,
     seed: int = 20260405,
+    use_opening_book: bool = True,
+    use_endgame_book: bool = True,
     mcts_exploration: float = 1.0,
     mcts_rollout_depth: int = 48,
     mcts_draw_threshold: int = 80,
@@ -20,13 +22,25 @@ def create_agent(
 ):
     lname = name.lower()
     if lname == "random":
-        return RandomAgent(side=side, seed=seed)
+        return RandomAgent(
+            side=side,
+            seed=seed,
+            use_opening_book=use_opening_book,
+            use_endgame_book=use_endgame_book,
+        )
     if lname == "minimax":
-        return MinimaxAgent(side=side, seed=seed)
+        return MinimaxAgent(
+            side=side,
+            seed=seed,
+            use_opening_book=use_opening_book,
+            use_endgame_book=use_endgame_book,
+        )
     if lname == "mcts":
         return MCTSAgent(
             side=side,
             seed=seed,
+            use_opening_book=use_opening_book,
+            use_endgame_book=use_endgame_book,
             exploration=mcts_exploration,
             rollout_depth=mcts_rollout_depth,
             draw_eval_threshold=mcts_draw_threshold,

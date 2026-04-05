@@ -53,6 +53,8 @@ def run_cli_game(
     time_limit_ms: int,
     max_plies: int,
     seed: int,
+    use_opening_book: bool = True,
+    use_endgame_book: bool = True,
     mcts_exploration: float = 1.0,
     mcts_rollout_depth: int = 48,
     mcts_draw_threshold: int = 80,
@@ -63,6 +65,8 @@ def run_cli_game(
         red_agent_name,
         RED,
         seed=seed + 1,
+        use_opening_book=use_opening_book,
+        use_endgame_book=use_endgame_book,
         mcts_exploration=mcts_exploration,
         mcts_rollout_depth=mcts_rollout_depth,
         mcts_draw_threshold=mcts_draw_threshold,
@@ -72,6 +76,8 @@ def run_cli_game(
         black_agent_name,
         BLACK,
         seed=seed + 2,
+        use_opening_book=use_opening_book,
+        use_endgame_book=use_endgame_book,
         mcts_exploration=mcts_exploration,
         mcts_rollout_depth=mcts_rollout_depth,
         mcts_draw_threshold=mcts_draw_threshold,
@@ -132,6 +138,8 @@ def run_cli(args: argparse.Namespace) -> int:
             time_limit_ms=args.time_limit_ms,
             max_plies=args.max_plies,
             seed=args.seed + idx * 97,
+            use_opening_book=not args.disable_opening_book,
+            use_endgame_book=not args.disable_endgame_book,
             mcts_exploration=args.mcts_exploration,
             mcts_rollout_depth=args.mcts_rollout_depth,
             mcts_draw_threshold=args.mcts_draw_threshold,
@@ -280,6 +288,8 @@ def run_gui(args: argparse.Namespace) -> int:
             red_agent_name: str,
             black_agent_name: str,
             time_limit_ms: int,
+            use_opening_book: bool,
+            use_endgame_book: bool,
             mcts_exploration: float,
             mcts_rollout_depth: int,
             mcts_draw_threshold: int,
@@ -297,6 +307,8 @@ def run_gui(args: argparse.Namespace) -> int:
                 else create_agent(
                     red_agent_name,
                     RED,
+                    use_opening_book=use_opening_book,
+                    use_endgame_book=use_endgame_book,
                     mcts_exploration=mcts_exploration,
                     mcts_rollout_depth=mcts_rollout_depth,
                     mcts_draw_threshold=mcts_draw_threshold,
@@ -309,6 +321,8 @@ def run_gui(args: argparse.Namespace) -> int:
                 else create_agent(
                     black_agent_name,
                     BLACK,
+                    use_opening_book=use_opening_book,
+                    use_endgame_book=use_endgame_book,
                     mcts_exploration=mcts_exploration,
                     mcts_rollout_depth=mcts_rollout_depth,
                     mcts_draw_threshold=mcts_draw_threshold,
@@ -486,6 +500,8 @@ def run_gui(args: argparse.Namespace) -> int:
         args.red_agent,
         args.black_agent,
         args.time_limit_ms,
+        not args.disable_opening_book,
+        not args.disable_endgame_book,
         args.mcts_exploration,
         args.mcts_rollout_depth,
         args.mcts_draw_threshold,
@@ -502,6 +518,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-plies", type=int, default=300, help="Move limit for CLI games")
     parser.add_argument("--games", type=int, default=1, help="Number of CLI games")
     parser.add_argument("--seed", type=int, default=20260405)
+    parser.add_argument(
+        "--disable-opening-book",
+        action="store_true",
+        help="Disable opening book for all AI agents",
+    )
+    parser.add_argument(
+        "--disable-endgame-book",
+        action="store_true",
+        help="Disable endgame book/tablebase policy for all AI agents",
+    )
     parser.add_argument(
         "--red-agent",
         type=str,

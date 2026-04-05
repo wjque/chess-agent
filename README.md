@@ -8,6 +8,7 @@ This project implements a playable Xiangqi (Chinese chess) engine and agents:
 - `MCTS` agent (UCT + heuristic rollouts)
 - PyQt6 GUI for human-vs-AI / AI-vs-AI play
 - CLI batch mode for agent comparison experiments
+- Opening book + endgame book (exact entries + small-material fallback policy)
 
 ## Features
 
@@ -57,12 +58,22 @@ continuous-pattern checks to keep behavior reproducible in coursework settings.
 - Book lookup by position key
 - Falls back to search when no match
 
+### Endgame Book
+
+- Local endgame entries in `chess/endgames.json`
+- Exact position hit for known tactical endgames
+- Small-material (<= configured piece count) fallback policy to prioritize:
+  - immediate wins
+  - checks/captures
+  - reducing enemy king mobility
+
 ## Project Structure
 
-- `chess/` core engine modules (`state`, `rules`, `judge`, `evaluate`, `opening`, etc.)
+- `chess/` core engine modules (`state`, `rules`, `judge`, `evaluate`, `opening`, `endgame`, etc.)
 - `agents/` agent implementations
 - `play.py` unified GUI/CLI entry point
 - `tests/` unit tests for rules, repetition, and search agents
+- `docs/minimax_vs_mcts_experiment.md` experiment and analysis plan
 
 ## Requirements
 
@@ -104,6 +115,8 @@ Useful options:
 - `--mcts-rollout-depth 48` rollout depth cap per simulation
 - `--mcts-draw-threshold 80` eval threshold for rollout cutoff-as-draw
 - `--mcts-rollout-check-samples 8` sampled moves for check-biased rollout
+- `--disable-opening-book` disable opening book for all agents
+- `--disable-endgame-book` disable endgame book for all agents
 
 ## Tests
 

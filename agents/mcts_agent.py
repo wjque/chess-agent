@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from chess.constants import BLACK, PIECE_VALUES, RED
+from chess.endgame import EndgameBook
 from chess.evaluate import evaluate_state
 from chess.move import Move
 from chess.opening import OpeningBook
@@ -52,15 +53,23 @@ class MCTSAgent:
     draw_eval_threshold: int = 80
     rollout_check_samples: int = 8
     seed: int = 20260405
+    use_opening_book: bool = True
+    use_endgame_book: bool = True
 
     def __post_init__(self) -> None:
         self._rng = random.Random(self.seed)
-        self._book = OpeningBook(seed=self.seed + 37)
+        self._opening_book = OpeningBook(seed=self.seed + 37) if self.use_opening_book else None
+        self._endgame_book = EndgameBook(seed=self.seed + 41) if self.use_endgame_book else None
 
     def select_move(self, state: GameState, time_limit_ms: int = 1500) -> Optional[Move]:
-        opening_move = self._book.query_opening(state)
-        if opening_move is not None:
-            return opening_move
+        if self._opening_book is not None:
+            opening_move = self._opening_book.query_opening(state)
+            if opening_move is not None:
+                return opening_move
+        if self._endgame_book is not None:
+            endgame_move = self._endgame_book.query_endgame(state)
+            if endgame_move is not None:
+                return endgame_move
 
         legal_moves = state.generate_legal_moves()
         if not legal_moves:
