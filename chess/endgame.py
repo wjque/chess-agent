@@ -1,4 +1,4 @@
-"""Endgame book and lightweight tablebase-style policies."""
+"""残局库与轻量表库风格策略"""
 
 from __future__ import annotations
 
@@ -44,9 +44,9 @@ class EndgameEntry:
 
 class EndgameBook:
     """
-    Practical endgame helper:
-    1) Exact position hits from local JSON (tablebase-style entries)
-    2) Small-material fallback policy for <= `max_piece_count` pieces
+    实用残局辅助器：
+    1) 本地 JSON 精确命中（表库风格条目）
+    2) 子力较少（<= `max_piece_count`）时的回退策略
     """
 
     def __init__(self, path: Optional[Path] = None, seed: int = 20260405) -> None:
@@ -168,18 +168,18 @@ class _EndgamePolicyScorer:
         if move.captured_piece is not None:
             score += 30_000 + PIECE_VALUES.get(move.captured_piece, 0) * 40
 
-        # Keep consistency with global eval sign, but make it mover-centric.
+        # 与全局评估符号保持一致，同时转换为当前行棋方视角
         static_eval = evaluate_state(next_state)
         score += static_eval if self._mover == RED else -static_eval
 
-        # In endgames, forcing checks and shrinking enemy mobility matters.
+        # 残局里将军压制与限制对方机动性很关键
         if next_state.is_in_check(next_state.side_to_move):
             score += 6_000
 
         enemy_legal = next_state.generate_legal_moves()
         score -= len(enemy_legal) * 180
 
-        # Encourage approaching the enemy king with active pieces.
+        # 鼓励主动子靠近对方将帅，提升收官效率
         enemy_king = rules.locate_king(next_state.board, self._opponent)
         if enemy_king is not None:
             dist = abs(move.to_row - enemy_king[0]) + abs(move.to_col - enemy_king[1])
@@ -187,7 +187,7 @@ class _EndgamePolicyScorer:
             if move.moved_piece is not None and move.moved_piece.upper() == "K":
                 score += max(0, 7 - dist) * 30
 
-        # Penalize repeating exact position immediately to reduce pointless shuffles.
+        # 惩罚立即回到原局面，减少无意义来回走子
         if next_state.position_key() == self._state.position_key():
             score -= 8_000
         return score

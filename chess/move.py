@@ -1,4 +1,4 @@
-"""Move representation for Xiangqi."""
+"""象棋走子对象定义"""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ class Move:
         return (self.to_row, self.to_col)
 
     def as_uci(self) -> str:
-        # Compact internal notation: frfctrtc
+        # 项目内部紧凑记法：frfctrtc（起点行列 + 终点行列）
         return f"{self.from_row}{self.from_col}{self.to_row}{self.to_col}"
 
     @classmethod

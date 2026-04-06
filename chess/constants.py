@@ -1,4 +1,4 @@
-"""Constants and static tables for Xiangqi."""
+"""象棋引擎使用的常量与静态表"""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ PIECE_VALUES = {
     "p": 70,
 }
 
-# Initial board: black on top, red on bottom.
+# 初始棋盘：黑方在上，红方在下
 INITIAL_BOARD = (
     "rnbakabnr",
     ".........",
@@ -47,7 +47,7 @@ RED_PALACE_ROWS = {7, 8, 9}
 BLACK_PALACE_ROWS = {0, 1, 2}
 PALACE_COLS = {3, 4, 5}
 
-# River sits between rows 4 and 5.
+# 楚河汉界位于第 4 行与第 5 行之间
 RIVER_TOP = 4
 RIVER_BOTTOM = 5
 

@@ -1,4 +1,4 @@
-"""Alpha-beta minimax agent (iterative deepening)."""
+"""基于 Alpha-Beta 的极小化极大智能体（迭代加深）"""
 
 from __future__ import annotations
 
@@ -15,6 +15,8 @@ from chess.state import GameState
 
 
 class SearchTimeout(Exception):
+    """搜索超时时抛出的内部异常"""
+
     pass
 
 
@@ -22,7 +24,7 @@ class SearchTimeout(Exception):
 class TTEntry:
     depth: int
     score: int
-    flag: str  # EXACT / LOWER / UPPER
+    flag: str  # EXACT（精确值）/ LOWER（下界）/ UPPER（上界）
     best_move: Optional[str]
 
 
@@ -36,6 +38,7 @@ class MinimaxAgent:
     use_endgame_book: bool = True
 
     def __post_init__(self) -> None:
+        # 置换表、历史启发和杀手着法用于提升搜索效率
         self._tt: dict[str, TTEntry] = {}
         self._history: dict[str, int] = {}
         self._killer: dict[int, list[str]] = {}
@@ -43,6 +46,7 @@ class MinimaxAgent:
         self._endgame_book = EndgameBook(seed=self.seed + 23) if self.use_endgame_book else None
 
     def select_move(self, state: GameState, time_limit_ms: int = 1500) -> Optional[Move]:
+        # 先尝试知识库着法，尽量减少开局/残局阶段搜索开销
         if self._opening_book is not None:
             opening_move = self._opening_book.query_opening(state)
             if opening_move is not None:
@@ -56,10 +60,12 @@ class MinimaxAgent:
         if not legal_moves:
             return None
 
+        # 给一个最小时间片，避免极短时间限制下完全不搜索
         deadline = time.monotonic() + max(0.05, time_limit_ms / 1000.0)
         best_move = legal_moves[0]
         best_score = -10**18
 
+        # 迭代加深：随时可中断并返回最近一次完整深度结果
         for depth in range(1, self.max_depth + 1):
             try:
                 score, move = self._negamax_root(state, depth, deadline)
@@ -68,10 +74,11 @@ class MinimaxAgent:
             if move is not None:
                 best_move = move
                 best_score = score
-        _ = best_score  # retained for optional debug hooks
+        _ = best_score  # 预留给调试钩子使用
         return best_move
 
     def _check_timeout(self, deadline: float) -> None:
+        # 在关键节点轮询时间，保证可控超时退出
         if time.monotonic() >= deadline:
             raise SearchTimeout
 
@@ -133,6 +140,7 @@ class MinimaxAgent:
         tt_move_key: Optional[str] = None
         if tt_entry is not None:
             tt_move_key = tt_entry.best_move
+            # 当缓存深度足够时，按边界信息直接裁剪或返回
             if tt_entry.depth >= depth:
                 if tt_entry.flag == "EXACT":
                     return tt_entry.score
@@ -170,10 +178,12 @@ class MinimaxAgent:
         return best_score
 
     def _static_eval_from_current_side(self, state: GameState) -> int:
+        # 评估函数固定按红方视角返回，这里转成当前行棋方视角
         eval_red = evaluate_state(state)
         return eval_red if state.side_to_move == RED else -eval_red
 
     def _on_beta_cutoff(self, move: Move, ply: int, depth: int) -> None:
+        # 非吃子导致的 beta 截断通常是高价值着法，记录到启发表
         if move.captured_piece is None:
             killers = self._killer.setdefault(ply, [])
             mv_key = move.as_uci()
@@ -197,7 +207,7 @@ class MinimaxAgent:
             if mv_key in killers:
                 score += 100_000
             score += self._history.get(mv_key, 0)
-            # Lightweight check-priority.
+            # 轻量将军优先：能形成将军的着法略微前排
             next_state = state.apply_move(mv)
             if next_state.is_in_check(next_state.side_to_move):
                 score += 50_000

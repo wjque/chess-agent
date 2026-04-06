@@ -1,4 +1,4 @@
-"""Base agent protocol."""
+"""智能体基础协议定义"""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from chess.state import GameState
 
 
 class Agent(Protocol):
+    """所有对弈智能体都需要实现的最小接口"""
+
     side: str
     name: str
 
@@ -19,5 +21,7 @@ class Agent(Protocol):
 
 @dataclass
 class AgentConfig:
+    """统一的智能体配置容器"""
+
     side: str
     time_limit_ms: int = 1500

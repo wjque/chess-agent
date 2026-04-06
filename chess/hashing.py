@@ -1,4 +1,4 @@
-"""Hash helpers used by transposition table and repetition checks."""
+"""置换表与循环判定使用的哈希工具"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class Hasher:
         return h
 
     def position_key(self, board: tuple[str, ...], side_to_move: str) -> str:
-        # String key keeps debugging and opening-book indexing straightforward.
+        # 字符串键更直观，便于调试和开局库索引
         return f"{''.join(board)}:{side_to_move}"
 
 

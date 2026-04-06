@@ -1,4 +1,4 @@
-"""Local opening book with legacy and structured JSON support."""
+"""本地开局库，兼容旧版与结构化 JSON 格式"""
 
 from __future__ import annotations
 
@@ -32,9 +32,8 @@ class OpeningBook:
             return
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        # Legacy schema: list[list[str]]
-        # Structured schema:
-        # {"lines":[{"moves":[...], "weight": 1}, ...]}
+        # 旧格式：list[list[str]]
+        # 新格式：{"lines":[{"moves":[...], "weight": 1}, ...]}
         lines: list[tuple[list[str], int]] = []
         if isinstance(data, list):
             for line in data:

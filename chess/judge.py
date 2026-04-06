@@ -1,4 +1,4 @@
-"""Terminal and repetition judgment for Xiangqi."""
+"""象棋终局与循环着法判定"""
 
 from __future__ import annotations
 
@@ -14,11 +14,9 @@ def _opponent(side: str) -> str:
 
 def evaluate_repetition_violation(state: "GameState") -> Optional[dict]:
     """
-    Practical repetition policy used in this project:
-    - Long check: same mover gives check in three consecutive own turns and
-      current position repeats 3+ times on that mover's turns.
-    - Long chase: same mover repeats a chase marker in three consecutive own
-      turns and current position repeats 3+ times on that mover's turns.
+    本项目采用的实用循环判负规则：
+    - 长将：同一方在自己连续三个回合都形成将军，且该方回合中当前局面重复达到 3 次及以上
+    - 长捉：同一方在自己连续三个回合重复追同一目标，且该方回合中当前局面重复达到 3 次及以上
     """
     history = state.history
     if len(history) < 6:

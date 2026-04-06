@@ -1,4 +1,4 @@
-"""Heuristic evaluation for Xiangqi search."""
+"""象棋搜索的启发式评估函数"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def _piece_square_bonus(piece: str, row: int, col: int) -> int:
     is_red = piece.isupper()
     rr = row if is_red else _mirror_row_for_black(row)
 
-    # Modest handcrafted tables to keep eval cheap.
+    # 轻量手工位置分，保证评估开销低
     if p == "P":
         advance = (9 - rr) * 6
         center = 6 - abs(4 - col) * 2
@@ -35,15 +35,16 @@ def _piece_square_bonus(piece: str, row: int, col: int) -> int:
     if p == "A":
         return 3 if col == 4 else 0
     if p == "K":
-        # Encourage king to stay central inside palace.
+        # 鼓励将帅在九宫中保持居中
         return 6 - abs(4 - col) * 2
     return 0
 
 
 def evaluate_state(state: "GameState") -> int:
     """
-    Returns score from RED's perspective:
-    positive -> RED better, negative -> BLACK better.
+    按红方视角返回局面分：
+    - 正数：红方优势
+    - 负数：黑方优势
     """
     material = 0
     positional = 0
@@ -55,7 +56,7 @@ def evaluate_state(state: "GameState") -> int:
             material += sign * PIECE_VALUES[piece]
             positional += sign * _piece_square_bonus(piece, r, c)
 
-    # Mobility with pseudo-legal moves is a cheap proxy.
+    # 用伪合法着法数近似机动性，成本低且效果稳定
     red_mob = len(rules.generate_pseudo_legal_moves(state, side=RED))
     black_mob = len(rules.generate_pseudo_legal_moves(state, side=BLACK))
     mobility = (red_mob - black_mob) * 2

@@ -1,4 +1,4 @@
-"""Xiangqi engine package."""
+"""象棋引擎包对外入口"""
 
 from chess.endgame import EndgameBook
 from chess.move import Move

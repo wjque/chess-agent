@@ -1,4 +1,4 @@
-"""MCTS agent with UCT policy."""
+"""采用 UCT 策略的 MCTS 智能体"""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ class MCTSNode:
     value: float = 0.0
 
     def best_uct_child(self, exploration: float) -> "MCTSNode":
+        # 选择 UCT 分数最高的子节点：利用 + 探索
         best = None
         best_score = -10**18
         for child in self.children:
@@ -57,11 +58,13 @@ class MCTSAgent:
     use_endgame_book: bool = True
 
     def __post_init__(self) -> None:
+        # 固定随机源，确保实验可复现
         self._rng = random.Random(self.seed)
         self._opening_book = OpeningBook(seed=self.seed + 37) if self.use_opening_book else None
         self._endgame_book = EndgameBook(seed=self.seed + 41) if self.use_endgame_book else None
 
     def select_move(self, state: GameState, time_limit_ms: int = 1500) -> Optional[Move]:
+        # 与其他智能体一致：优先使用开局库和残局库
         if self._opening_book is not None:
             opening_move = self._opening_book.query_opening(state)
             if opening_move is not None:
@@ -81,14 +84,14 @@ class MCTSAgent:
             node = root
             sim_state = state
 
-            # Selection
+            # 1) Selection：沿 UCT 最优路径向下走到叶子附近
             while not node.untried_moves and node.children:
                 node = node.best_uct_child(self.exploration)
                 if node.move is None:
                     break
                 sim_state = sim_state.apply_move(node.move)
 
-            # Expansion
+            # 2) Expansion：从未尝试着法中扩展一个新节点
             if node.untried_moves:
                 mv = self._rng.choice(node.untried_moves)
                 node.untried_moves.remove(mv)
@@ -102,14 +105,13 @@ class MCTSAgent:
                 node.children.append(child)
                 node = child
 
-            # Simulation
+            # 3) Simulation：执行快速 rollout 估值
             winner = self._rollout(sim_state, deadline)
 
-            # Backpropagation
+            # 4) Backpropagation：将结果回传至根节点
             while node is not None:
                 node.visits += 1
-                # Node value is tracked from perspective of "player who just moved"
-                # into this node, so max-UCT remains correct on alternating turns.
+                # 节点价值按“刚走子的一方”记分，轮换回合时可直接最大化
                 player_just_moved = _other_side(node.state.side_to_move)
                 if winner is None:
                     node.value += 0.5
@@ -139,13 +141,14 @@ class MCTSAgent:
             move = self._select_rollout_move(sim, legal)
             sim = sim.apply_move(move)
 
-        # Depth/time cutoff fallback: use static eval sign.
+        # 深度/时间截断时，回退到静态评估符号判断优势方
         score = evaluate_state(sim)
         if abs(score) < self.draw_eval_threshold:
             return None
         return RED if score > 0 else BLACK
 
     def _select_rollout_move(self, state: GameState, moves: list[Move]) -> Move:
+        # 吃子优先：先抓高价值子，提升 rollout 信号强度
         captures = [m for m in moves if m.captured_piece is not None]
         if captures:
             captures.sort(key=lambda m: PIECE_VALUES.get(m.captured_piece or ".", 0), reverse=True)
@@ -157,6 +160,7 @@ class MCTSAgent:
             ]
             return self._rng.choice(top_choices)
 
+        # 其次偏好将军着法，增强战术敏感性
         checking_moves: list[Move] = []
         sample_size = min(self.rollout_check_samples, len(moves))
         sampled = self._rng.sample(moves, sample_size)

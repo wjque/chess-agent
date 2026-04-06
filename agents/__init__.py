@@ -1,4 +1,4 @@
-"""Agent factory and exports."""
+"""智能体工厂与对外导出"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ def create_agent(
     mcts_draw_threshold: int = 80,
     mcts_rollout_check_samples: int = 8,
 ):
+    # 统一名称分发，便于 CLI/GUI 通过字符串创建智能体
     lname = name.lower()
     if lname == "random":
         return RandomAgent(

@@ -1,4 +1,4 @@
-"""Rule engine for Xiangqi move generation and check detection."""
+"""象棋规则引擎：走法生成与将军检测"""
 
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ def _generate_king_moves(
             continue
         _append_move(moves, board, row, col, nr, nc, side, captures_only)
 
-    # Flying general capture.
+    # 将帅照面（飞将）时可直接吃对方将帅
     step = -1 if side == RED else 1
     r = row + step
     while 0 <= r < ROWS:
@@ -214,13 +214,13 @@ def _generate_cannon_moves(
     for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         r = row + dr
         c = col + dc
-        # Non-capturing segment before the screen.
+        # 炮架前方的连续空格：仅可平移，不吃子
         while in_bounds(r, c) and board[r][c] == EMPTY:
             if not captures_only:
                 _append_move(moves, board, row, col, r, c, side, captures_only)
             r += dr
             c += dc
-        # Skip exactly one screen, then first piece can be captured.
+        # 越过恰好一个炮架后，遇到的第一个棋子若为敌子则可吃
         r += dr
         c += dc
         while in_bounds(r, c):

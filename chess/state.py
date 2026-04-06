@@ -1,4 +1,4 @@
-"""State representation for Xiangqi."""
+"""象棋局面状态表示"""
 
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ from chess import rules
 
 @dataclass(frozen=True)
 class MoveRecord:
+    """用于长打/长将判定的历史走子记录"""
+
     position_hash: str
     move: Move
     is_check: bool
@@ -32,6 +34,8 @@ class MoveRecord:
 
 @dataclass(frozen=True)
 class GameState:
+    """不可变游戏状态对象，负责派发规则与裁判逻辑"""
+
     board: tuple[str, ...]
     side_to_move: str
     history: tuple[MoveRecord, ...] = ()
@@ -87,7 +91,7 @@ class GameState:
         base_next_state = GameState(new_board, next_side, self.history)
         gives_check = base_next_state.is_in_check(next_side)
 
-        # A lightweight "chase" marker used by long-chase practical detection.
+        # 轻量“追打标记”：用于课程版长捉判定
         target_piece: Optional[str] = None
         chase_target: Optional[tuple[int, int]] = None
         if captured_piece != EMPTY:
