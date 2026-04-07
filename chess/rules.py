@@ -17,6 +17,7 @@ from chess.constants import (
     ROWS,
 )
 from chess.move import Move
+from chess.state import GameState
 
 
 def in_bounds(row: int, col: int) -> bool:
@@ -255,7 +256,7 @@ def _generate_pawn_moves(
 
 
 def generate_pseudo_legal_moves(
-    state: "GameState", side: Optional[str] = None, captures_only: bool = False
+    state: GameState, side: Optional[str] = None, captures_only: bool = False
 ) -> list[Move]:
     side = state.side_to_move if side is None else side
     board = state.board
@@ -283,21 +284,21 @@ def generate_pseudo_legal_moves(
     return moves
 
 
-def is_square_attacked(state: "GameState", row: int, col: int, by_side: str) -> bool:
+def is_square_attacked(state: GameState, row: int, col: int, by_side: str) -> bool:
     for move in generate_pseudo_legal_moves(state, side=by_side, captures_only=True):
         if move.to_row == row and move.to_col == col:
             return True
     return False
 
 
-def is_in_check(state: "GameState", side: str) -> bool:
+def is_in_check(state: GameState, side: str) -> bool:
     king_pos = locate_king(state.board, side)
     if king_pos is None:
         return True
     return is_square_attacked(state, king_pos[0], king_pos[1], by_side=other_side(side))
 
 
-def generate_legal_moves(state: "GameState", side: Optional[str] = None) -> list[Move]:
+def generate_legal_moves(state: GameState, side: Optional[str] = None) -> list[Move]:
     side = state.side_to_move if side is None else side
     legal: list[Move] = []
     for move in generate_pseudo_legal_moves(state, side=side, captures_only=False):
@@ -308,7 +309,7 @@ def generate_legal_moves(state: "GameState", side: Optional[str] = None) -> list
 
 
 def attacked_targets_by_piece(
-    state: "GameState", row: int, col: int, side: str
+    state: GameState, row: int, col: int, side: str
 ) -> list[tuple[int, int, str]]:
     targets: list[tuple[int, int, str]] = []
     for mv in generate_pseudo_legal_moves(state, side=side, captures_only=True):

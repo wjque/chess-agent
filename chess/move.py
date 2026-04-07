@@ -31,7 +31,7 @@ class Move:
         return f"{self.from_row}{self.from_col}{self.to_row}{self.to_col}"
 
     @classmethod
-    def from_uci(cls, text: str) -> "Move":
+    def from_uci(cls, text: str) -> Move:
         if len(text) != 4 or not text.isdigit():
             raise ValueError(f"Bad move notation: {text}")
         return cls(
