@@ -6,13 +6,14 @@ from typing import Optional
 
 from chess.constants import BLACK, EMPTY, RED
 from chess import rules
+from chess.state import GameState
 
 
 def _opponent(side: str) -> str:
     return BLACK if side == RED else RED
 
 
-def evaluate_repetition_violation(state: "GameState") -> Optional[dict]:
+def evaluate_repetition_violation(state: GameState) -> Optional[dict]:
     """
     本项目采用的实用循环判负规则：
     - 长将：同一方在自己连续三个回合都形成将军，且该方回合中当前局面重复达到 3 次及以上
@@ -57,7 +58,7 @@ def evaluate_repetition_violation(state: "GameState") -> Optional[dict]:
     return None
 
 
-def is_terminal(state: "GameState") -> tuple[bool, Optional[dict]]:
+def is_terminal(state: GameState) -> tuple[bool, Optional[dict]]:
     red_king = rules.locate_king(state.board, RED)
     black_king = rules.locate_king(state.board, BLACK)
     if red_king is None:

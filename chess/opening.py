@@ -1,4 +1,4 @@
-"""本地开局库，兼容旧版与结构化 JSON 格式"""
+"""本地开局库（统一结构化 JSON 格式）"""
 
 from __future__ import annotations
 
@@ -27,42 +27,31 @@ class OpeningBook:
         self._load(path)
 
     def _load(self, path: Path) -> None:
+        self._table = {}
         if not path.exists():
+            return
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
             self._table = {}
             return
-        data = json.loads(path.read_text(encoding="utf-8"))
 
-        # 旧格式：list[list[str]]
-        # 新格式：{"lines":[{"moves":[...], "weight": 1}, ...]}
-        lines: list[tuple[list[str], int]] = []
-        if isinstance(data, list):
-            for line in data:
-                if isinstance(line, list):
-                    moves = [mv for mv in line if isinstance(mv, str)]
-                    if moves:
-                        lines.append((moves, 1))
-        elif isinstance(data, dict):
-            raw_lines = data.get("lines", [])
-            if isinstance(raw_lines, list):
-                for line in raw_lines:
-                    if isinstance(line, dict):
-                        moves = line.get("moves", [])
-                        if not isinstance(moves, list):
-                            continue
-                        clean_moves = [mv for mv in moves if isinstance(mv, str)]
-                        if not clean_moves:
-                            continue
-                        weight = line.get("weight", 1)
-                        if not isinstance(weight, int) or weight <= 0:
-                            weight = 1
-                        lines.append((clean_moves, weight))
-                    elif isinstance(line, list):
-                        moves = [mv for mv in line if isinstance(mv, str)]
-                        if moves:
-                            lines.append((moves, 1))
-        else:
-            self._table = {}
+        raw_lines = raw.get("lines", [])
+        if not isinstance(raw_lines, list):
             return
+        lines: list[tuple[list[str], int]] = []
+        for line in raw_lines:
+            if not isinstance(line, dict):
+                continue
+            moves = line.get("moves")
+            if not isinstance(moves, list):
+                continue
+            clean_moves = [mv for mv in moves if isinstance(mv, str)]
+            if not clean_moves:
+                continue
+            weight = line.get("weight", 1)
+            if not isinstance(weight, int) or weight <= 0:
+                weight = 1
+            lines.append((clean_moves, weight))
 
         table: dict[str, list[_OpeningChoice]] = {}
         for line, line_weight in lines:

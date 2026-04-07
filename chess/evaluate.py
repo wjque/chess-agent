@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from chess.constants import BLACK, PIECE_VALUES, RED
 from chess import rules
+from chess.state import GameState
 
 
 MATE_SCORE = 1_000_000
@@ -40,7 +41,7 @@ def _piece_square_bonus(piece: str, row: int, col: int) -> int:
     return 0
 
 
-def evaluate_state(state: "GameState") -> int:
+def evaluate_state(state: GameState) -> int:
     """
     按红方视角返回局面分：
     - 正数：红方优势

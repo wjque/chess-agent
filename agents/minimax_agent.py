@@ -74,7 +74,7 @@ class MinimaxAgent:
             if move is not None:
                 best_move = move
                 best_score = score
-        _ = best_score  # 预留给调试钩子使用
+        _ = best_score
         return best_move
 
     def _check_timeout(self, deadline: float) -> None:
