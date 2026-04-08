@@ -35,7 +35,7 @@ def format_result(result: Optional[dict]) -> str:
     winner = result.get("winner")
     reason = result.get("reason", "unknown")
     winner_text = "Draw" if winner is None else side_name(winner)
-    return f"{winner_text} ({reason})"
+    return f"Winner: {winner_text} ({reason})"
 
 
 @dataclass
@@ -194,6 +194,16 @@ def run_gui(args: argparse.Namespace) -> int:
             self.owner = owner
             self.setMinimumSize(self.margin * 2 + self.cell * 8 + 1, self.margin * 2 + self.cell * 9 + 1)
 
+        def _board_to_view(self, row: int, col: int) -> tuple[int, int]:
+            if self.owner.bottom_side == RED:
+                return row, col
+            return ROWS - 1 - row, COLS - 1 - col
+
+        def _view_to_board(self, row: int, col: int) -> tuple[int, int]:
+            if self.owner.bottom_side == RED:
+                return row, col
+            return ROWS - 1 - row, COLS - 1 - col
+
         def paintEvent(self, event) -> None:  # noqa: N802
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -232,9 +242,15 @@ def run_gui(args: argparse.Namespace) -> int:
             # Highlights.
             if self.owner.selected is not None:
                 sr, sc = self.owner.selected
-                self._draw_marker(painter, sr, sc, QColor(255, 210, 50, 180))
+                vr, vc = self._board_to_view(sr, sc)
+                self._draw_marker(painter, vr, vc, QColor(255, 210, 50, 180))
             for tr, tc in self.owner.legal_targets:
-                self._draw_marker(painter, tr, tc, QColor(50, 170, 255, 160))
+                vr, vc = self._board_to_view(tr, tc)
+                self._draw_marker(painter, vr, vc, QColor(50, 170, 255, 160))
+            if self.owner.checked_king is not None:
+                kr, kc = self.owner.checked_king
+                vr, vc = self._board_to_view(kr, kc)
+                self._draw_check_ring(painter, vr, vc)
 
             # Pieces.
             for r in range(ROWS):
@@ -242,8 +258,9 @@ def run_gui(args: argparse.Namespace) -> int:
                     piece = board[r][c]
                     if piece == EMPTY:
                         continue
-                    px = x0 + c * self.cell
-                    py = y0 + r * self.cell
+                    vr, vc = self._board_to_view(r, c)
+                    px = x0 + vc * self.cell
+                    py = y0 + vr * self.cell
                     is_red = piece.isupper()
                     fill = QColor("#f8eee0") if is_red else QColor("#f0f0f0")
                     text = QColor("#b5301a") if is_red else QColor("#1f1f1f")
@@ -273,6 +290,15 @@ def run_gui(args: argparse.Namespace) -> int:
             painter.setPen(QPen(color))
             painter.drawEllipse(x - 8, y - 8, 16, 16)
 
+        def _draw_check_ring(self, painter: QPainter, row: int, col: int) -> None:
+            x = self.margin + col * self.cell
+            y = self.margin + row * self.cell
+            pen = QPen(QColor("#cc1f1f"))
+            pen.setWidth(3)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(x - 25, y - 25, 50, 50)
+
         def mousePressEvent(self, event) -> None:  # noqa: N802
             x = event.position().x()
             y = event.position().y()
@@ -280,7 +306,8 @@ def run_gui(args: argparse.Namespace) -> int:
             row = round((y - self.margin) / self.cell)
             if not (0 <= row < ROWS and 0 <= col < COLS):
                 return
-            self.owner.on_board_click(row, col)
+            board_row, board_col = self._view_to_board(row, col)
+            self.owner.on_board_click(board_row, board_col)
 
     class XiangqiWindow(QMainWindow):
         def __init__(
@@ -301,6 +328,7 @@ def run_gui(args: argparse.Namespace) -> int:
             self.time_limit_ms = time_limit_ms
             self.red_agent_name = red_agent_name
             self.black_agent_name = black_agent_name
+            self.checked_king: Optional[tuple[int, int]] = None
             self.red_agent = (
                 None
                 if red_agent_name == HUMAN
@@ -329,10 +357,14 @@ def run_gui(args: argparse.Namespace) -> int:
                     mcts_rollout_check_samples=mcts_rollout_check_samples,
                 )
             )
+            human_side = self.human_side()
+            self.bottom_side = human_side if human_side is not None else RED
             self.selected: Optional[tuple[int, int]] = None
             self.legal_targets: set[tuple[int, int]] = set()
+            self._state_stack: list[GameState] = [self.state]
             self._executor = ThreadPoolExecutor(max_workers=1)
             self._pending: Optional[tuple[str, Future]] = None
+            self._alert_token = 0
 
             root = QWidget()
             self.setCentralWidget(root)
@@ -340,10 +372,16 @@ def run_gui(args: argparse.Namespace) -> int:
 
             top = QHBoxLayout()
             self.status_label = QLabel("")
+            self.alert_label = QLabel("")
+            self.alert_label.setStyleSheet("color: #b22222; font-weight: 700;")
+            self.undo_button = QPushButton("Undo")
+            self.undo_button.clicked.connect(self.on_undo)
             self.restart_button = QPushButton("Restart")
             self.restart_button.clicked.connect(self.on_restart)
             top.addWidget(self.status_label)
+            top.addWidget(self.alert_label)
             top.addStretch()
+            top.addWidget(self.undo_button)
             top.addWidget(self.restart_button)
             layout.addLayout(top)
 
@@ -357,7 +395,7 @@ def run_gui(args: argparse.Namespace) -> int:
             self.refresh_status()
             self.try_start_ai_turn()
 
-        def closeEvent(self, event) -> None:  # noqa: N802
+        def closeEvent(self, event) -> None:
             self._executor.shutdown(wait=False, cancel_futures=True)
             super().closeEvent(event)
 
@@ -365,9 +403,11 @@ def run_gui(args: argparse.Namespace) -> int:
             return self.red_agent if self.state.side_to_move == RED else self.black_agent
 
         def human_side(self) -> Optional[str]:
-            if self.red_agent is None:
+            red_human = self.red_agent is None
+            black_human = self.black_agent is None
+            if red_human and not black_human:
                 return RED
-            if self.black_agent is None:
+            if black_human and not red_human:
                 return BLACK
             return None
 
@@ -375,23 +415,100 @@ def run_gui(args: argparse.Namespace) -> int:
             self.state = GameState.initial()
             self.selected = None
             self.legal_targets.clear()
+            self._state_stack = [self.state]
+            if self._pending is not None:
+                _, future = self._pending
+                future.cancel()
             self._pending = None
             self.poll_timer.stop()
+            self._dismiss_alert()
             self.refresh_status()
             self.board_widget.update()
             self.try_start_ai_turn()
 
         def refresh_status(self) -> None:
+            self.checked_king = self._checked_king_position()
             terminal, result = self.state.is_terminal()
             if terminal:
-                self.status_label.setText(f"Game Over: {format_result(result)}")
+                self.status_label.setText(f"Game Over, Winner: {format_result(result)}")
+                self.undo_button.setEnabled(len(self._state_stack) > 1)
                 return
             turn = side_name(self.state.side_to_move)
             side_agent = self.current_agent()
             if side_agent is None:
-                self.status_label.setText(f"{turn} to move (Human)")
+                status = f"{turn} to move (Human)"
             else:
-                self.status_label.setText(f"{turn} to move ({side_agent.name}, {self.time_limit_ms} ms)")
+                status = f"{turn} to move ({side_agent.name}, time limit: {self.time_limit_ms} ms)"
+            if self.checked_king is not None:
+                status = f"{status} | Check!"
+            self.status_label.setText(status)
+            self.undo_button.setEnabled(len(self._state_stack) > 1)
+
+        def on_undo(self) -> None:
+            if len(self._state_stack) <= 1:
+                return
+            self.selected = None
+            self.legal_targets.clear()
+            if self._pending is not None:
+                _, future = self._pending
+                future.cancel()
+            self._pending = None
+            self.poll_timer.stop()
+            self._dismiss_alert()
+
+            # Single-human games undo back to the human's turn.
+            self._pop_one_state()
+            if self.human_side() is not None:
+                while len(self._state_stack) > 1 and self.current_agent() is not None:
+                    self._pop_one_state()
+
+            self.refresh_status()
+            self.board_widget.update()
+            self.try_start_ai_turn()
+
+        def _pop_one_state(self) -> None:
+            if len(self._state_stack) <= 1:
+                return
+            self._state_stack.pop()
+            self.state = self._state_stack[-1]
+
+        def _checked_king_position(self) -> Optional[tuple[int, int]]:
+            checked_side = self.state.side_to_move
+            if not self.state.is_in_check(checked_side):
+                return None
+            king_piece = "K" if checked_side == RED else "k"
+            for row_idx, row in enumerate(self.state.board):
+                col_idx = row.find(king_piece)
+                if col_idx != -1:
+                    return (row_idx, col_idx)
+            return None
+
+        def _dismiss_alert(self) -> None:
+            self._alert_token += 1
+            self.alert_label.setText("")
+
+        def _show_temporary_alert(self, text: str, duration_ms: int = 1400) -> None:
+            self._alert_token += 1
+            token = self._alert_token
+            self.alert_label.setText(text)
+            QTimer.singleShot(duration_ms, lambda: self._clear_alert_if_fresh(token))
+
+        def _clear_alert_if_fresh(self, token: int) -> None:
+            if token != self._alert_token:
+                return
+            self.alert_label.setText("")
+
+        def _apply_move(self, move: Move) -> None:
+            self.state = self.state.apply_move(move)
+            self._state_stack.append(self.state)
+            self.selected = None
+            self.legal_targets.clear()
+            self.refresh_status()
+            terminal, _ = self.state.is_terminal()
+            if not terminal and self.checked_king is not None:
+                self._show_temporary_alert(f"Check! {side_name(self.state.side_to_move)} king is in danger.")
+            self.board_widget.update()
+            self._maybe_show_game_over()
 
         def on_board_click(self, row: int, col: int) -> None:
             if self.current_agent() is not None:
@@ -421,12 +538,7 @@ def run_gui(args: argparse.Namespace) -> int:
             move = self._find_selected_move(row, col)
             if move is None:
                 return
-            self.state = self.state.apply_move(move)
-            self.selected = None
-            self.legal_targets.clear()
-            self.refresh_status()
-            self.board_widget.update()
-            self._maybe_show_game_over()
+            self._apply_move(move)
             self.try_start_ai_turn()
 
         def _find_selected_move(self, row: int, col: int) -> Optional[Move]:
@@ -489,10 +601,7 @@ def run_gui(args: argparse.Namespace) -> int:
                 self.refresh_status()
                 self._maybe_show_game_over()
                 return
-            self.state = self.state.apply_move(move)
-            self.refresh_status()
-            self.board_widget.update()
-            self._maybe_show_game_over()
+            self._apply_move(move)
             self.try_start_ai_turn()
 
     app = QApplication(sys.argv)

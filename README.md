@@ -66,7 +66,6 @@
 - `chess/`：引擎核心模块（`state`、`rules`、`judge`、`evaluate`、`opening`、`endgame` 等）
 - `agents/`：智能体实现
 - `play.py`：GUI/CLI 统一入口
-- `tests/`：规则、重复局面、搜索智能体相关单元测试
 
 ## 运行要求
 
