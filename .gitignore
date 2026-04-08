@@ -1,0 +1,12 @@
+__pycache__/
+venv/
+.venv/
+.vscode/
+.idea/
+Thumbs.db
+*.log
+dist/
+build/
+.ipynb_checkpoints/
+node_modules/
+docs/

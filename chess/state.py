@@ -91,7 +91,7 @@ class GameState:
         base_next_state = GameState(new_board, next_side, self.history)
         gives_check = base_next_state.is_in_check(next_side)
 
-        # 轻量“追打标记”：用于课程版长捉判定
+        # 追打标记，判定长捉 / 长将
         target_piece: Optional[str] = None
         chase_target: Optional[tuple[int, int]] = None
         if captured_piece != EMPTY:
