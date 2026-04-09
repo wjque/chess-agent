@@ -6,6 +6,7 @@ import argparse
 import statistics
 import sys
 import time
+from tqdm import tqdm
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
@@ -89,7 +90,7 @@ def run_cli_game(
     red_times: list[float] = []
     black_times: list[float] = []
 
-    for ply in range(max_plies):
+    for ply in tqdm(range(max_plies), desc="Running plies"):
         terminal, result = state.is_terminal()
         if terminal:
             return CliGameStats(

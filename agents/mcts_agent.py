@@ -115,9 +115,10 @@ class MCTSAgent:
             # 4) Backpropagation.
             while node is not None:
                 node.visits += 1
+                player_just_moved = BLACK if node.state.side_to_move == RED else RED
                 if winner is None:
                     node.value += 0.5
-                elif winner == node.state.side_to_move:
+                elif winner == player_just_moved:
                     node.value += 1.0
                 node = node.parent
 
