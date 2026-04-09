@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import statistics
+import os
 import sys
 import time
 from tqdm import tqdm
@@ -135,6 +137,7 @@ def run_cli_game(
 def run_cli(args: argparse.Namespace) -> int:
     games = args.games
     results: list[CliGameStats] = []
+    os.makedirs(args.outputs, exist_ok=True)
     for idx in range(games):
         stats = run_cli_game(
             red_agent_name=args.red_agent,
@@ -155,6 +158,38 @@ def run_cli(args: argparse.Namespace) -> int:
             f"Game {idx + 1:02d}/{games}: winner={stats.winner}, "
             f"reason={stats.reason}, plies={stats.plies}"
         )
+    
+    opening_book_tag = "on" if not args.disable_opening_book else "off"
+    csv_filename = (
+        f"red_{args.red_agent}_vs_black_{args.black_agent}_"
+        f"{args.time_limit_ms}ms_opening_{opening_book_tag}.csv"
+    )
+    csv_filename = os.path.join(args.outputs, csv_filename)
+    with open(csv_filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "game",
+                "winner",
+                "reason",
+                "plies",
+                "red_total_time_ms",
+                "black_total_time_ms",
+            ]
+        )
+        for idx, r in enumerate(results, start=1):
+            winner_text = "Draw" if r.winner is None else side_name(r.winner)
+            writer.writerow(
+                [
+                    idx,
+                    winner_text,
+                    r.reason,
+                    r.plies,
+                    round(sum(r.red_times), 3),
+                    round(sum(r.black_times), 3),
+                ]
+            )
+    print(f"Saved CLI game results to {csv_filename}")
 
     red_wins = sum(1 for r in results if r.winner == RED)
     black_wins = sum(1 for r in results if r.winner == BLACK)
@@ -639,6 +674,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-plies", type=int, default=300, help="Move limit for CLI games")
     parser.add_argument("--games", type=int, default=1, help="Number of CLI games")
     parser.add_argument("--seed", type=int, default=20260405)
+    parser.add_argument("--outputs", type=str, default="./outputs", help="Store results")
     parser.add_argument(
         "--disable-opening-book",
         action="store_true",
