@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Optional
 
 from chess.constants import BLACK, EMPTY, RED
-from chess import rules
 from chess.state import GameState
 
 
@@ -59,13 +58,6 @@ def evaluate_repetition_violation(state: GameState) -> Optional[dict]:
 
 
 def is_terminal(state: GameState) -> tuple[bool, Optional[dict]]:
-    red_king = rules.locate_king(state.board, RED)
-    black_king = rules.locate_king(state.board, BLACK)
-    if red_king is None:
-        return True, {"winner": BLACK, "reason": "king_captured"}
-    if black_king is None:
-        return True, {"winner": RED, "reason": "king_captured"}
-
     violation = evaluate_repetition_violation(state)
     if violation is not None:
         loser = violation["loser"]

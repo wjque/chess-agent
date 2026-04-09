@@ -204,7 +204,7 @@ def run_gui(args: argparse.Namespace) -> int:
                 return row, col
             return ROWS - 1 - row, COLS - 1 - col
 
-        def paintEvent(self, event) -> None:  # noqa: N802
+        def paintEvent(self, event) -> None:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             painter.fillRect(self.rect(), QColor("#f4d9a8"))
@@ -299,7 +299,7 @@ def run_gui(args: argparse.Namespace) -> int:
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawEllipse(x - 25, y - 25, 50, 50)
 
-        def mousePressEvent(self, event) -> None:  # noqa: N802
+        def mousePressEvent(self, event) -> None:
             x = event.position().x()
             y = event.position().y()
             col = round((x - self.margin) / self.cell)
@@ -426,6 +426,7 @@ def run_gui(args: argparse.Namespace) -> int:
             self.board_widget.update()
             self.try_start_ai_turn()
 
+        # 窗口上方提示信息
         def refresh_status(self) -> None:
             self.checked_king = self._checked_king_position()
             terminal, result = self.state.is_terminal()
@@ -444,9 +445,11 @@ def run_gui(args: argparse.Namespace) -> int:
             self.status_label.setText(status)
             self.undo_button.setEnabled(len(self._state_stack) > 1)
 
+        # 增加悔棋功能
         def on_undo(self) -> None:
             if len(self._state_stack) <= 1:
                 return
+            # 清空 agent 正在计算的进程
             self.selected = None
             self.legal_targets.clear()
             if self._pending is not None:
@@ -456,7 +459,7 @@ def run_gui(args: argparse.Namespace) -> int:
             self.poll_timer.stop()
             self._dismiss_alert()
 
-            # Single-human games undo back to the human's turn.
+            # 人类单步悔棋，回退到人类方
             self._pop_one_state()
             if self.human_side() is not None:
                 while len(self._state_stack) > 1 and self.current_agent() is not None:
