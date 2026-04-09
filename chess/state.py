@@ -41,11 +41,11 @@ class GameState:
     history: tuple[MoveRecord, ...] = ()
 
     @classmethod
-    def initial(cls) -> "GameState":
+    def initial(cls) -> GameState:
         return cls(board=INITIAL_BOARD, side_to_move=RED, history=())
 
     @classmethod
-    def from_rows(cls, rows: list[str], side_to_move: str = RED) -> "GameState":
+    def from_rows(cls, rows: list[str], side_to_move: str = RED) -> GameState:
         if len(rows) != ROWS:
             raise ValueError("board rows must be 10")
         for row in rows:
@@ -69,7 +69,7 @@ class GameState:
         target_side = self.side_to_move if side is None else side
         return rules.is_in_check(self, target_side)
 
-    def apply_move(self, move: Move) -> "GameState":
+    def apply_move(self, move: Move) -> GameState:
         fr, fc = move.from_row, move.from_col
         tr, tc = move.to_row, move.to_col
         if not (0 <= fr < ROWS and 0 <= fc < COLS and 0 <= tr < ROWS and 0 <= tc < COLS):

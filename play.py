@@ -58,7 +58,8 @@ def run_cli_game(
     mcts_exploration: float = 1.0,
     mcts_rollout_depth: int = 48,
     mcts_draw_threshold: int = 80,
-    mcts_rollout_check_samples: int = 8,
+    mcts_rollout_topk: int = 3,
+    mcts_rollout_hanging_penalty_ratio: float = 0.6,
 ) -> CliGameStats:
     state = GameState.initial()
     red_agent = create_agent(
@@ -70,7 +71,8 @@ def run_cli_game(
         mcts_exploration=mcts_exploration,
         mcts_rollout_depth=mcts_rollout_depth,
         mcts_draw_threshold=mcts_draw_threshold,
-        mcts_rollout_check_samples=mcts_rollout_check_samples,
+        mcts_rollout_topk=mcts_rollout_topk,
+        mcts_rollout_hanging_penalty_ratio=mcts_rollout_hanging_penalty_ratio,
     )
     black_agent = create_agent(
         black_agent_name,
@@ -81,7 +83,8 @@ def run_cli_game(
         mcts_exploration=mcts_exploration,
         mcts_rollout_depth=mcts_rollout_depth,
         mcts_draw_threshold=mcts_draw_threshold,
-        mcts_rollout_check_samples=mcts_rollout_check_samples,
+        mcts_rollout_topk=mcts_rollout_topk,
+        mcts_rollout_hanging_penalty_ratio=mcts_rollout_hanging_penalty_ratio,
     )
     red_times: list[float] = []
     black_times: list[float] = []
@@ -143,7 +146,8 @@ def run_cli(args: argparse.Namespace) -> int:
             mcts_exploration=args.mcts_exploration,
             mcts_rollout_depth=args.mcts_rollout_depth,
             mcts_draw_threshold=args.mcts_draw_threshold,
-            mcts_rollout_check_samples=args.mcts_rollout_check_samples,
+            mcts_rollout_topk=args.mcts_rollout_topk,
+            mcts_rollout_hanging_penalty_ratio=args.mcts_rollout_hanging_penalty_ratio,
         )
         results.append(stats)
         print(
@@ -320,7 +324,8 @@ def run_gui(args: argparse.Namespace) -> int:
             mcts_exploration: float,
             mcts_rollout_depth: int,
             mcts_draw_threshold: int,
-            mcts_rollout_check_samples: int,
+            mcts_rollout_topk: int,
+            mcts_rollout_hanging_penalty_ratio: float,
         ) -> None:
             super().__init__()
             self.setWindowTitle("Xiangqi Search Agent")
@@ -340,7 +345,8 @@ def run_gui(args: argparse.Namespace) -> int:
                     mcts_exploration=mcts_exploration,
                     mcts_rollout_depth=mcts_rollout_depth,
                     mcts_draw_threshold=mcts_draw_threshold,
-                    mcts_rollout_check_samples=mcts_rollout_check_samples,
+                    mcts_rollout_topk=mcts_rollout_topk,
+                    mcts_rollout_hanging_penalty_ratio=mcts_rollout_hanging_penalty_ratio,
                 )
             )
             self.black_agent = (
@@ -354,7 +360,8 @@ def run_gui(args: argparse.Namespace) -> int:
                     mcts_exploration=mcts_exploration,
                     mcts_rollout_depth=mcts_rollout_depth,
                     mcts_draw_threshold=mcts_draw_threshold,
-                    mcts_rollout_check_samples=mcts_rollout_check_samples,
+                    mcts_rollout_topk=mcts_rollout_topk,
+                    mcts_rollout_hanging_penalty_ratio=mcts_rollout_hanging_penalty_ratio,
                 )
             )
             human_side = self.human_side()
@@ -439,9 +446,9 @@ def run_gui(args: argparse.Namespace) -> int:
             if side_agent is None:
                 status = f"{turn} to move (Human)"
             else:
-                status = f"{turn} to move ({side_agent.name}, time limit: {self.time_limit_ms} ms)"
+                status = f"{turn} to move ({side_agent.name})"
             if self.checked_king is not None:
-                status = f"{status} | Check!"
+                status = f"{status} | "
             self.status_label.setText(status)
             self.undo_button.setEnabled(len(self._state_stack) > 1)
 
@@ -617,7 +624,8 @@ def run_gui(args: argparse.Namespace) -> int:
         args.mcts_exploration,
         args.mcts_rollout_depth,
         args.mcts_draw_threshold,
-        args.mcts_rollout_check_samples,
+        args.mcts_rollout_topk,
+        args.mcts_rollout_hanging_penalty_ratio,
     )
     window.show()
     return app.exec()
@@ -671,10 +679,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Static-eval absolute threshold to treat truncated rollout as draw",
     )
     parser.add_argument(
-        "--mcts-rollout-check-samples",
+        "--mcts-rollout-topk",
         type=int,
-        default=8,
-        help="How many rollout moves to sample when searching for checking moves",
+        default=3,
+        help="Top-K rollout candidates used for weighted tactical sampling",
+    )
+    parser.add_argument(
+        "--mcts-rollout-hanging-penalty-ratio",
+        type=float,
+        default=1.5,
+        help="Penalty ratio for hanging captured-piece trades in rollout scoring",
     )
     return parser
 
@@ -684,8 +698,10 @@ def main() -> int:
     args = parser.parse_args()
     if args.mcts_rollout_depth <= 0:
         parser.error("--mcts-rollout-depth must be > 0")
-    if args.mcts_rollout_check_samples <= 0:
-        parser.error("--mcts-rollout-check-samples must be > 0")
+    if args.mcts_rollout_topk <= 0:
+        parser.error("--mcts-rollout-topk must be > 0")
+    if args.mcts_rollout_hanging_penalty_ratio < 0:
+        parser.error("--mcts-rollout-hanging-penalty-ratio must be >= 0")
     if args.mcts_draw_threshold < 0:
         parser.error("--mcts-draw-threshold must be >= 0")
     if args.mcts_exploration < 0:

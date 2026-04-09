@@ -1,4 +1,4 @@
-"""采用 UCT 策略的 MCTS 智能体"""
+"""MCTS agent with UCT selection and tactical rollout policy."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
+from chess import rules
 from chess.constants import BLACK, PIECE_VALUES, RED
 from chess.endgame import EndgameBook
 from chess.evaluate import evaluate_state
@@ -27,7 +28,7 @@ class MCTSNode:
     value: float = 0.0
 
     def best_uct_child(self, exploration: float) -> "MCTSNode":
-        # 选择 UCT 分数最高的子节点：利用 + 探索
+        # Select child by UCT = exploitation + exploration.
         best = None
         best_score = -10**18
         for child in self.children:
@@ -52,19 +53,19 @@ class MCTSAgent:
     exploration: float = 1.0
     rollout_depth: int = 48
     draw_eval_threshold: int = 80
-    rollout_check_samples: int = 8
+    rollout_topk: int = 3
+    rollout_hanging_penalty_ratio: float = 1.5
     seed: int = 20260405
     use_opening_book: bool = True
     use_endgame_book: bool = True
 
     def __post_init__(self) -> None:
-        # 固定随机源，确保实验可复现
+        # 固定随机数种子保证可复现性
         self._rng = random.Random(self.seed)
         self._opening_book = OpeningBook(seed=self.seed + 37) if self.use_opening_book else None
         self._endgame_book = EndgameBook(seed=self.seed + 41) if self.use_endgame_book else None
 
     def select_move(self, state: GameState, time_limit_ms: int = 1500) -> Optional[Move]:
-        # 与其他智能体一致：优先使用开局库和残局库
         if self._opening_book is not None:
             opening_move = self._opening_book.query_opening(state)
             if opening_move is not None:
@@ -78,24 +79,27 @@ class MCTSAgent:
         if not legal_moves:
             return None
 
+        # Search time limit
         deadline = time.monotonic() + max(0.05, time_limit_ms / 1000.0)
         root = MCTSNode(state=state, untried_moves=legal_moves.copy())
         while time.monotonic() < deadline:
             node = root
             sim_state = state
 
-            # 1) Selection：沿 UCT 最优路径向下走到叶子附近
+            # 1) Selection: follow UCT-best path until expandable node.
             while not node.untried_moves and node.children:
                 node = node.best_uct_child(self.exploration)
                 if node.move is None:
                     break
                 sim_state = sim_state.apply_move(node.move)
 
-            # 2) Expansion：从未尝试着法中扩展一个新节点
+            # 2) Expansion: expand one untried move.
             if node.untried_moves:
-                mv = self._rng.choice(node.untried_moves)
+                # Use tactical rollout policy for expansion 
+                # To improve search efficiency
+                mv, next_state = self._select_rollout_move(sim_state, node.untried_moves)
                 node.untried_moves.remove(mv)
-                sim_state = sim_state.apply_move(mv)
+                sim_state = next_state
                 child = MCTSNode(
                     state=sim_state,
                     parent=node,
@@ -105,70 +109,132 @@ class MCTSAgent:
                 node.children.append(child)
                 node = child
 
-            # 3) Simulation：执行快速 rollout 估值
+            # 3) Simulation: run tactical rollout.
             winner = self._rollout(sim_state, deadline)
 
-            # 4) Backpropagation：将结果回传至根节点
+            # 4) Backpropagation.
             while node is not None:
                 node.visits += 1
-                # 节点价值按“刚走子的一方”记分，轮换回合时可直接最大化
-                player_just_moved = BLACK if node.state.side_to_move == RED else RED 
                 if winner is None:
                     node.value += 0.5
-                elif winner == player_just_moved:
+                elif winner == node.state.side_to_move:
                     node.value += 1.0
                 node = node.parent
 
-        if not root.children:
-            return self._rng.choice(legal_moves)
-        return max(
+        # If search is too shallow, fallback to tactical policy on root legal moves.
+        # This avoids random-looking choices when only a few simulations finished.
+        if root.visits <= max(4, len(legal_moves) // 4):
+            fallback = self._select_rollout_move(state, legal_moves)
+            if fallback is not None:
+                return fallback[0]
+        best_mcts_move = max(
             root.children,
             key=lambda c: (c.visits, c.value / c.visits if c.visits else 0.0),
         ).move
+        if best_mcts_move is None:
+            return self._rng.choice(legal_moves)
+        return best_mcts_move
 
     def _rollout(self, state: GameState, deadline: float) -> Optional[str]:
         sim = state
         for _ in range(self.rollout_depth):
             if time.monotonic() >= deadline:
                 break
-            terminal, result = sim.is_terminal()
-            if terminal:
-                return result.get("winner") if result else None
+            # Long-chase / Long-check
+            violation = sim.evaluate_repetition_violation()
+            if violation is not None:
+                loser = violation["loser"]
+                return BLACK if loser == RED else RED
+            # Generate all posible moves
             legal = sim.generate_legal_moves()
             if not legal:
-                terminal, result = sim.is_terminal()
-                return result.get("winner") if result else None
-            move = self._select_rollout_move(sim, legal)
-            sim = sim.apply_move(move)
+                return BLACK if sim.side_to_move == RED else RED
+            _, sim = self._select_rollout_move(sim, legal)
 
-        # 深度/时间截断时，回退到静态评估符号判断优势方
+        # Depth/time cutoff: fallback to static evaluation sign.
         score = evaluate_state(sim)
-        if abs(score) < self.draw_eval_threshold:
+        if abs(score) <= self.draw_eval_threshold:
             return None
         return RED if score > 0 else BLACK
 
-    def _select_rollout_move(self, state: GameState, moves: list[Move]) -> Move:
-        # 吃子优先：先抓高价值子，提升 rollout 信号强度
-        captures = [m for m in moves if m.captured_piece is not None]
-        if captures:
-            captures.sort(key=lambda m: PIECE_VALUES.get(m.captured_piece or ".", 0), reverse=True)
-            top_value = PIECE_VALUES.get(captures[0].captured_piece or ".", 0)
-            top_choices = [
-                m
-                for m in captures
-                if PIECE_VALUES.get(m.captured_piece or ".", 0) == top_value
-            ]
-            return self._rng.choice(top_choices)
+    def _select_rollout_move(
+        self,
+        state: GameState,
+        moves: list[Move],
+    ) -> Optional[tuple[Move, GameState]]:
+        scored_moves: list[tuple[tuple[int, int, float, int], Move, GameState, bool]] = []
+        side = state.side_to_move
 
-        # 其次偏好将军着法
-        checking_moves: list[Move] = []
-        sample_size = min(self.rollout_check_samples, len(moves))
-        sampled = self._rng.sample(moves, sample_size)
-        for m in sampled:
-            ns = state.apply_move(m)
-            if ns.is_in_check(ns.side_to_move):
-                checking_moves.append(m)
-        if checking_moves:
-            return self._rng.choice(checking_moves)
+        for move in moves:
+            next_state = state.apply_move(move)
+            
+            # 是否能将军
+            gives_check = next_state.is_in_check(next_state.side_to_move)
+            
+            # 待走子状态
+            moved_piece = move.moved_piece or state.board[move.from_row][move.from_col]
+            moved_piece_value = PIECE_VALUES.get(moved_piece, 0)
+            
+            # 评估当前状态的危险程度
+            escape_score = 0
+            if rules.is_square_attacked(
+                state,
+                move.from_row,
+                move.from_col,
+                by_side=next_state.side_to_move,
+            ):
+                escape_score = moved_piece_value
+            
+            # 评估下一步的攻势
+            attacked_targets = rules.attacked_targets_by_piece(
+                next_state,
+                move.to_row,
+                move.to_col,
+                side,
+            )
+            attack_score = 0
+            for p in attacked_targets:
+                if p[2].upper()=="K":
+                    # 将军只用 give_check 控制
+                    continue
+                attack_score += PIECE_VALUES.get(p[2], 0)
+            net_attack = escape_score + 0.3 * attack_score # hard code
+            
+            # 评估下一步的收益
+            capture_score = PIECE_VALUES.get(move.captured_piece or ".", 0)
+            net_capture = float(escape_score + capture_score)
+            
+            # 评估下一步的危险程度
+            if rules.is_square_attacked(
+                next_state,
+                move.to_row,
+                move.to_col,
+                by_side=next_state.side_to_move,
+            ):
+                gives_check = False
+                net_capture -= self.rollout_hanging_penalty_ratio * moved_piece_value
+                net_attack  -= self.rollout_hanging_penalty_ratio * moved_piece_value
+            
+            net_capture = max(0, net_capture)
 
-        return self._rng.choice(moves)
+            # 分数排序：将军>吃子净价值>估计进攻价值
+            score = (
+                1 if gives_check else 0,
+                net_capture,
+                net_attack,
+            )
+            scored_moves.append((score, move, next_state))
+
+        scored_moves.sort(key=lambda item: item[0], reverse=True)
+        topk = max(1, min(self.rollout_topk, len(scored_moves)))
+        top_choices = scored_moves[:topk]
+
+        if len(top_choices) == 1:
+            _, best_move, best_next_state = top_choices[0]
+            return best_move, best_next_state
+
+        # 按照排序顺序给出随机选择的权重
+        weights = list(range(topk, 0, -1))
+        choice_idx = self._rng.choices(range(topk), weights=weights, k=1)[0]
+        _, selected_move, selected_next_state = top_choices[choice_idx]
+        return selected_move, selected_next_state

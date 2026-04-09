@@ -18,7 +18,8 @@ def create_agent(
     mcts_exploration: float = 1.0,
     mcts_rollout_depth: int = 48,
     mcts_draw_threshold: int = 80,
-    mcts_rollout_check_samples: int = 8,
+    mcts_rollout_topk: int = 3,
+    mcts_rollout_hanging_penalty_ratio: float = 0.6,
 ):
     # 统一名称分发，便于 CLI/GUI 通过字符串创建智能体
     lname = name.lower()
@@ -45,7 +46,8 @@ def create_agent(
             exploration=mcts_exploration,
             rollout_depth=mcts_rollout_depth,
             draw_eval_threshold=mcts_draw_threshold,
-            rollout_check_samples=mcts_rollout_check_samples,
+            rollout_topk=mcts_rollout_topk,
+            rollout_hanging_penalty_ratio=mcts_rollout_hanging_penalty_ratio,
         )
     raise ValueError(f"Unknown agent: {name}")
 

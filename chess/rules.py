@@ -80,13 +80,11 @@ def _append_move(
         return
     moved_piece = board[fr][fc]
     target = board[tr][tc]
+    # 不允许攻击己方棋子
     if is_friend_piece(target, side):
         return
+    # 只生成进攻性走法
     if captures_only and target == EMPTY:
-        return
-    if not captures_only and target != EMPTY and not is_enemy_piece(target, side):
-        return
-    if target != EMPTY and not is_enemy_piece(target, side):
         return
     moves.append(
         Move(
@@ -107,11 +105,8 @@ def _generate_king_moves(
     for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         nr = row + dr
         nc = col + dc
-        if not in_bounds(nr, nc):
-            continue
-        if not in_palace(nr, nc, side):
-            continue
-        _append_move(moves, board, row, col, nr, nc, side, captures_only)
+        if in_bounds(nr, nc) and in_palace(nr, nc, side):
+            _append_move(moves, board, row, col, nr, nc, side, captures_only)
 
     # 将帅照面（飞将）时可直接吃对方将帅
     step = -1 if side == RED else 1
@@ -148,10 +143,13 @@ def _generate_elephant_moves(
         nc = col + dc
         mr = row + dr // 2
         mc = col + dc // 2
+        # 棋盘限制
         if not in_bounds(nr, nc):
             continue
+        # 象脚限制
         if board[mr][mc] != EMPTY:
             continue
+        # 过河限制
         if side == RED and nr < 5:
             continue
         if side == BLACK and nr > 4:
@@ -179,6 +177,7 @@ def _generate_horse_moves(
         leg_c = col + ldc
         if not in_bounds(leg_r, leg_c):
             continue
+        # 马腿限制
         if board[leg_r][leg_c] != EMPTY:
             continue
         nr = row + dr
@@ -242,10 +241,12 @@ def _generate_pawn_moves(
     directions: list[tuple[int, int]] = []
     if side == RED:
         directions.append((-1, 0))
+        # 过河兵的方向扩展
         if row <= 4:
             directions.extend(((0, -1), (0, 1)))
     else:
         directions.append((1, 0))
+        # 过河卒的方向扩展
         if row >= 5:
             directions.extend(((0, -1), (0, 1)))
     for dr, dc in directions:
@@ -254,7 +255,7 @@ def _generate_pawn_moves(
         _append_move(moves, board, row, col, nr, nc, side, captures_only)
     return moves
 
-
+# 生成所有伪走法（可限制是否只生成吃子的走法）
 def generate_pseudo_legal_moves(
     state: GameState, side: Optional[str] = None, captures_only: bool = False
 ) -> list[Move]:
@@ -284,6 +285,59 @@ def generate_pseudo_legal_moves(
     return moves
 
 
+def generate_pseudo_square_moves(
+    state: GameState,
+    row: int,
+    col: int,
+    side: Optional[str] = None,
+    captures_only: bool = False,
+) -> list[Move]:
+    if not in_bounds(row, col):
+        return []
+
+    board = state.board
+    piece = board[row][col]
+    piece_side = side_of_piece(piece)
+    if piece == EMPTY:
+        return []
+
+    side = state.side_to_move if side is None else side
+    
+    # 指定棋子和指定的一方/走子方不匹配时返回空走法
+    if piece_side != side:
+        return []
+    # 指定的一方和走子方不匹配时，判断是战术分析，临时交换状态
+    check_state = state
+    if side != state.side_to_move:
+        check_state = GameState(board=state.board, side_to_move=side, history=state.history)
+
+    p = piece.upper()
+    pseudo_moves: list[Move]
+    if p == "K":
+        pseudo_moves = _generate_king_moves(board, row, col, side, captures_only)
+    elif p == "A":
+        pseudo_moves = _generate_advisor_moves(board, row, col, side, captures_only)
+    elif p == "B":
+        pseudo_moves = _generate_elephant_moves(board, row, col, side, captures_only)
+    elif p == "N":
+        pseudo_moves = _generate_horse_moves(board, row, col, side, captures_only)
+    elif p == "R":
+        pseudo_moves = _generate_rook_moves(board, row, col, side, captures_only)
+    elif p == "C":
+        pseudo_moves = _generate_cannon_moves(board, row, col, side, captures_only)
+    elif p == "P":
+        pseudo_moves = _generate_pawn_moves(board, row, col, side, captures_only)
+    else:
+        return []
+
+    legal_moves: list[Move] = []
+    for move in pseudo_moves:
+        next_state = check_state.apply_move(move)
+        if not is_in_check(next_state, side):
+            legal_moves.append(move)
+    return legal_moves
+
+
 def is_square_attacked(state: GameState, row: int, col: int, by_side: str) -> bool:
     for move in generate_pseudo_legal_moves(state, side=by_side, captures_only=True):
         if move.to_row == row and move.to_col == col:
@@ -298,6 +352,17 @@ def is_in_check(state: GameState, side: str) -> bool:
     return is_square_attacked(state, king_pos[0], king_pos[1], by_side=other_side(side))
 
 
+def attacked_targets_by_piece(
+    state: GameState, row: int, col: int, side: str
+) -> list[tuple[int, int, str]]:
+    targets: list[tuple[int, int, str]] = []
+    for mv in generate_pseudo_square_moves(state, row, col, side, captures_only=True):
+        captured = state.board[mv.to_row][mv.to_col]
+        if captured != EMPTY:
+            targets.append((mv.to_row, mv.to_col, captured))
+    return targets
+
+
 def generate_legal_moves(state: GameState, side: Optional[str] = None) -> list[Move]:
     side = state.side_to_move if side is None else side
     legal: list[Move] = []
@@ -306,16 +371,3 @@ def generate_legal_moves(state: GameState, side: Optional[str] = None) -> list[M
         if not is_in_check(next_state, side):
             legal.append(move)
     return legal
-
-
-def attacked_targets_by_piece(
-    state: GameState, row: int, col: int, side: str
-) -> list[tuple[int, int, str]]:
-    targets: list[tuple[int, int, str]] = []
-    for mv in generate_pseudo_legal_moves(state, side=side, captures_only=True):
-        if mv.from_row != row or mv.from_col != col:
-            continue
-        captured = state.board[mv.to_row][mv.to_col]
-        if captured != EMPTY:
-            targets.append((mv.to_row, mv.to_col, captured))
-    return targets

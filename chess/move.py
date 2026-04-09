@@ -15,7 +15,9 @@ class Move:
     from_col: int
     to_row: int
     to_col: int
+    # 表示该步走的是哪个棋子
     moved_piece: Optional[str] = None
+    # 表示该步能吃掉哪个棋子
     captured_piece: Optional[str] = None
 
     @property
