@@ -112,7 +112,7 @@ class MCTSAgent:
             while node is not None:
                 node.visits += 1
                 # 节点价值按“刚走子的一方”记分，轮换回合时可直接最大化
-                player_just_moved = _other_side(node.state.side_to_move)
+                player_just_moved = BLACK if node.state.side_to_move == RED else RED 
                 if winner is None:
                     node.value += 0.5
                 elif winner == player_just_moved:
@@ -160,7 +160,7 @@ class MCTSAgent:
             ]
             return self._rng.choice(top_choices)
 
-        # 其次偏好将军着法，增强战术敏感性
+        # 其次偏好将军着法
         checking_moves: list[Move] = []
         sample_size = min(self.rollout_check_samples, len(moves))
         sampled = self._rng.sample(moves, sample_size)
@@ -172,7 +172,3 @@ class MCTSAgent:
             return self._rng.choice(checking_moves)
 
         return self._rng.choice(moves)
-
-
-def _other_side(side: str) -> str:
-    return BLACK if side == RED else RED
