@@ -700,7 +700,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mcts-exploration",
         type=float,
-        default=1.0,
+        default=0.2,
         help="UCT exploration constant for MCTS",
     )
     parser.add_argument(
