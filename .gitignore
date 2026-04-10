@@ -11,4 +11,3 @@ build/
 node_modules/
 docs/
 tests/
-outputs/
