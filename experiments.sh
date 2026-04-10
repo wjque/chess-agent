@@ -16,28 +16,31 @@ AGENTS=("mcts minimax" "minimax mcts" "minimax random" "random minimax" "mcts ra
 # ====================================
 # 执行实验
 # ====================================
-for MS in "${TIME_LIMITS[@]}"; do
-    echo "------------------------------------------------"
-    echo "正在开始实验 Time Limit = ${MS}ms"
-    echo "------------------------------------------------"
+for OPEN_BOOK in "" "--disable-opening-book"; do
+    for MS in "${TIME_LIMITS[@]}"; do
+        echo "------------------------------------------------"
+        echo "正在开始实验 Time Limit = ${MS}ms"
+        echo "------------------------------------------------"
 
-    for PAIR in "${AGENTS[@]}"; do
-        # 将组合拆分为 red 和 black
-        set -- $PAIR
-        RED=$1
-        BLACK=$2
+        for PAIR in "${AGENTS[@]}"; do
+            # 将组合拆分为 red 和 black
+            set -- $PAIR
+            RED=$1
+            BLACK=$2
 
-        echo "[运行中] Red: $RED vs Black: $BLACK (Limit: ${MS}ms)"
-        
-        python play.py \
-            --mode cli \
-            --games $GAMES \
-            --red-agent "$RED" \
-            --black-agent "$BLACK" \
-            --mcts-exploration $MCTS_EXPLORATION \
-            --time-limit-ms "$MS"
-            
-        echo "[完成] Red: $RED vs Black: $BLACK"
+            echo "[运行中] Red: $RED vs Black: $BLACK (Limit: ${MS}ms)"
+
+            python play.py \
+                --mode cli \
+                --games $GAMES \
+                --red-agent "$RED" \
+                --black-agent "$BLACK" \
+                --mcts-exploration $MCTS_EXPLORATION \
+                --time-limit-ms "$MS" \
+                $OPEN_BOOK
+
+            echo "[完成] Red: $RED vs Black: $BLACK"
+        done
     done
 done
 
