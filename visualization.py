@@ -342,8 +342,8 @@ def build_avg_step_time(records: list[GameRecord]) -> dict[tuple[int, str], floa
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Visualize chess-agent experiment CSV outputs.")
-    parser.add_argument("--input-dir", type=Path, default=Path(__file__).resolve().parent)
-    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent / "figures")
+    parser.add_argument("--input-dir", type=Path, default=Path(__file__).resolve().parent / "outputs")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent / "outputs" / "figures")
     parser.add_argument("--opening-tag", type=str, default="on")
     parser.add_argument("--compare-time-ms", type=int, default=800)
     args = parser.parse_args()
